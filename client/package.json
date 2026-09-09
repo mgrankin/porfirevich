@@ -5,6 +5,7 @@
   "description": "Frontend for Porfirevich project",
   "main": "src/main.ts",
   "scripts": {
+    "test": "node --test tests/*.test.cjs",
     "start": "vite --host 0.0.0.0",
     "dev": "vite --host 0.0.0.0",
     "build": "vue-tsc --noEmit && vite build",
