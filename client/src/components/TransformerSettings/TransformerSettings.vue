@@ -9,7 +9,7 @@
           indicator
           :tooltip="false"
           :min="1"
-          :max="300"
+          :max="150"
         />
       </b-field>
     </div>
@@ -22,7 +22,7 @@
           rounded
           indicator
           :tooltip="false"
-          :min="0"
+          :min="0.5"
           :max="10"
           :step="0.1"
           :custom-formatter="formatTemperature"

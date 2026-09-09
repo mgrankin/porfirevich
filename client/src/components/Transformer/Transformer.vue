@@ -19,7 +19,7 @@
             type="is-primary"
             :icon-left="store.lastReply ? 'restart' : 'send'"
             :loading="store.isLoading"
-            :disabled="!store.prompt"
+            :disabled="!store.prompt || !store.activeModel"
             class="transform-btn"
             @click="store.transform"
           >
@@ -62,11 +62,12 @@ function handleRequestError() {
     position: 'is-bottom',
     actionText: 'Повторить',
     queue: false,
-    onAction: () => store.transform(),
+    onAction: () => store.models.length ? store.transform() : loadModels(),
   });
 }
 
 function onKeydown(event: KeyboardEvent) {
+  if (!(event.target instanceof HTMLElement) || !event.target.closest('#editorjs')) return;
   if (event.key === 'Tab') {
     event.preventDefault();
     if (store.isLoading) store.abort();
@@ -74,18 +75,29 @@ function onKeydown(event: KeyboardEvent) {
   } else if (event.key === 'Escape') {
     store.easyEscape();
   } else if ((event.metaKey || event.ctrlKey) && event.code === 'KeyZ') {
+    event.preventDefault();
     store.historyBack();
   }
 }
 
-onMounted(async () => {
-  await store.getModels();
+async function loadModels() {
+  try {
+    await store.getModels();
+  } catch {
+    store.isError = true;
+    handleRequestError();
+  }
+}
+
+onMounted(() => {
   store.initialize();
   store.createEditor('#editorjs');
   window.addEventListener('keydown', onKeydown);
+  void loadModels();
 });
 
 onUnmounted(() => {
+  store.abort();
   window.removeEventListener('keydown', onKeydown);
   store.removeWindowUnloadListener();
 });

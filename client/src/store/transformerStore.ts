@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia';
-import { ref, watch } from 'vue';
+import { computed, ref, watch } from 'vue';
 import debounce from 'debounce';
 import { generateApi, getModelsApi } from '@/api/porfirevich';
 import { TextEditor } from '@/editor/TextEditor';
@@ -9,6 +9,7 @@ import type { Scheme } from '@shared/types/Scheme';
 export const useTransformerStore = defineStore('transformer', () => {
   const editor = ref<TextEditor>();
   const text = ref('');
+  const prompt = computed(() => text.value.trim());
   const isReady = ref(false);
   const isLoading = ref(false);
   const isError = ref(false);
@@ -23,6 +24,7 @@ export const useTransformerStore = defineStore('transformer', () => {
   const history = ref<Scheme[]>([]);
   const models = ref<string[]>([]);
   const activeModel = ref('');
+  let transformId = 0;
 
   const handleRequestError = ref(() => {
     console.error('Request error occurred');
@@ -33,23 +35,37 @@ export const useTransformerStore = defineStore('transformer', () => {
   const historyInterval = 300;
 
   function saveSettings() {
-    localStorage.setItem(
-      'transformerSettings',
-      JSON.stringify({
-        tokens: tokens.value,
-        temperature: temperature.value,
-        activeModel: activeModel.value,
-      })
-    );
+    try {
+      localStorage.setItem(
+        'transformerSettings',
+        JSON.stringify({
+          tokens: tokens.value,
+          temperature: temperature.value,
+          activeModel: activeModel.value,
+        })
+      );
+    } catch {
+      // Storage can be disabled or full; generation should still work.
+    }
   }
 
   function loadSettings() {
-    const settings = localStorage.getItem('transformerSettings');
-    if (settings) {
+    try {
+      const settings = localStorage.getItem('transformerSettings');
+      if (!settings) return;
       const parsedSettings = JSON.parse(settings);
-      tokens.value = parsedSettings.tokens;
-      temperature.value = parsedSettings.temperature;
-      activeModel.value = parsedSettings.activeModel;
+      if (!parsedSettings || typeof parsedSettings !== 'object') return;
+      if (typeof parsedSettings.tokens === 'number' && Number.isFinite(parsedSettings.tokens)) {
+        tokens.value = Math.min(150, Math.max(1, Math.round(parsedSettings.tokens)));
+      }
+      if (typeof parsedSettings.temperature === 'number' && Number.isFinite(parsedSettings.temperature)) {
+        temperature.value = Math.min(10, Math.max(0.1, parsedSettings.temperature));
+      }
+      if (models.value.includes(parsedSettings.activeModel)) {
+        activeModel.value = parsedSettings.activeModel;
+      }
+    } catch {
+      // Ignore malformed settings or unavailable browser storage.
     }
   }
 
@@ -60,6 +76,7 @@ export const useTransformerStore = defineStore('transformer', () => {
 
   watch([tokens, temperature, activeModel], () => {
     abort();
+    cleanLastReply();
     saveSettings();
   });
 
@@ -102,12 +119,16 @@ export const useTransformerStore = defineStore('transformer', () => {
   }
 
   function abort() {
+    transformId += 1;
     abortControllers.value?.abort();
+    abortControllers.value = undefined;
+    isLoading.value = false;
     isError.value = false;
   }
 
   async function transform() {
     abort();
+    const currentTransformId = transformId;
     try {
       const prompt = getPrompt();
       if (!prompt) {
@@ -121,6 +142,7 @@ export const useTransformerStore = defineStore('transformer', () => {
         const data = await request(prompt);
         currentReplies = data && data.replies;
       }
+      if (currentTransformId !== transformId) return;
       if (currentReplies && editor.value) {
         const reply = currentReplies.pop() || '';
         deleteLastReply();
@@ -137,12 +159,13 @@ export const useTransformerStore = defineStore('transformer', () => {
         replies.value = currentReplies;
       }
     } catch (err) {
+      if (currentTransformId !== transformId) return;
       if (!(err instanceof Error && err.name === 'AbortError')) {
         isError.value = true;
         handleRequestError.value();
       }
     } finally {
-      isLoading.value = false;
+      if (currentTransformId === transformId) isLoading.value = false;
     }
   }
 
@@ -183,9 +206,9 @@ export const useTransformerStore = defineStore('transformer', () => {
     if (!models.value.length) {
       const data = await getModelsApi();
       models.value = data;
-      activeModel.value = data[0];
+      activeModel.value = data.includes('original') ? 'original' : data[0];
+      loadSettings();
     }
-    loadSettings();
   }
 
   function setPlaceholder() {
@@ -219,6 +242,7 @@ export const useTransformerStore = defineStore('transformer', () => {
 
   function clean() {
     abort();
+    cleanLastReply();
     removeWindowUnloadListener();
     editor.value?.clean();
     text.value = '';
@@ -282,6 +306,7 @@ export const useTransformerStore = defineStore('transformer', () => {
   }
 
   function changeModel() {
+    if (!models.value.length) return;
     const activeModelIndex = models.value.indexOf(activeModel.value);
     activeModel.value =
       activeModelIndex !== -1
@@ -291,7 +316,7 @@ export const useTransformerStore = defineStore('transformer', () => {
   }
 
   function setActiveModel(model: string) {
-    activeModel.value = model;
+    if (models.value.includes(model)) activeModel.value = model;
   }
 
   function initialize() {

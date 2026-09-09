@@ -12,6 +12,11 @@ export default tseslint.config(
   ...tseslint.configs.recommended,
   ...pluginVue.configs['flat/recommended'],
   {
+    files: ['tests/**/*.cjs'],
+    languageOptions: { globals: globals.node },
+    rules: { '@typescript-eslint/no-require-imports': 'off' },
+  },
+  {
     files: ['**/*.{ts,vue}'],
     languageOptions: {
       globals: {
