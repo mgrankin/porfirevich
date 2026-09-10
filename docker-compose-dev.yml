@@ -15,8 +15,7 @@ services:
     extends:
       file: docker-compose.yml
       service: db
-    image: postgres:17.11-alpine
     restart: "no"
 
 volumes:
-  db:
+  db18:

@@ -17,7 +17,7 @@
 
 Рабочий стек: Node **24.20.0 LTS**, Vue **3.5.42**, Pinia **4.0.3**,
 Router **5.3.1**, Buefy **3.1.0**, Vite **8.2.2**, Express **5.2.1**,
-TypeORM **1.1.1**, Puppeteer **25.10.0**, PostgreSQL **14.24**.
+TypeORM **1.1.1**, Puppeteer **25.10.0**, PostgreSQL **18.6**.
 Точные зависимости зафиксированы в трёх `package-lock.json`.
 TypeScript оставлен на **6.0.3**: текущий `typescript-eslint` ещё требует `<6.1`.
 
@@ -40,8 +40,12 @@ docker compose up -d --wait app
 ```
 
 Сайт: `http://localhost:3000`; PostgreSQL: `localhost:5433`.
-Истории хранятся в named volume `db`, открытки — в `./media`.
+Истории хранятся в named volume `db18`, открытки — в `./media`.
 Не используйте `docker compose down -v` для рабочей установки.
+
+При обновлении существующей установки с PostgreSQL 14 (или dev с 17) сначала
+выполните [миграцию данных](docs/postgresql.md). Простая смена тега несовместима
+со старым форматом данных; новый том без восстановления будет пустым.
 
 Автосинхронизация схемы в production выключена. Обновление TypeORM не требует
 изменения рабочей схемы; имя существующего индекса email сохранено явно.
@@ -108,6 +112,8 @@ unit/integration/browser-тесты и `npm audit`. Для включения CI
 Для отката верните прежний image под тег `porfirevich:local` и повторите команду
 обновления `app`. БД и `media` остаются на месте.
 
-PostgreSQL обновлён в пределах 14.x: [14.24 не требует dump/restore](https://www.postgresql.org/docs/release/14.24/).
-Поддержка 14.x заканчивается в ноябре 2026; переход на более новую major-версию
-следует запланировать отдельно с проверкой резервной копии и временем переключения.
+PostgreSQL используется из стабильной ветки **18**, поддерживаемой до ноября 2030.
+Порядок major-миграции и ограничения отката: [docs/postgresql.md](docs/postgresql.md).
+Сроки поддержки остальных компонентов: [docs/support.md](docs/support.md).
+Диски, Traefik, резервные копии и проверка автозапуска на dobro:
+[docs/operations-dobro.md](docs/operations-dobro.md).
